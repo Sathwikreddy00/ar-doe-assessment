@@ -1,0 +1,5 @@
+
+——————— AlphaRecon Technologies DevOps Engineer Assessment ———————
+:: Spring Boot Version: ${spring-boot.version}
+:: Application Name:    ${spring.application.name}
+:: Application Version: ${application.version}
