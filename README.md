@@ -39,6 +39,7 @@ The H2 database is embedded inside the application — it is not a separate serv
 The solution is explicitly structured around three independent layers:
 
 ### Build — `Dockerfile` + `.github/workflows/ci.yml`
+
 Responsible for compiling source code into a runnable artifact. Nothing in the build layer touches runtime behavior or environment-specific configuration.
 
 The Dockerfile uses a **multi-stage build**:
@@ -48,6 +49,7 @@ The Dockerfile uses a **multi-stage build**:
 The GitHub Actions pipeline automates this build process on every push to `main`, ensuring the application is always in a buildable and testable state.
 
 ### Configuration — `application.yaml` + `.env` + `.env.example`
+
 Responsible for all environment-specific values. No configuration is hardcoded in the application or build files.
 
 `application.yaml` uses Spring Boot's `${VAR:default}` syntax throughout — if an environment variable is set it is used, otherwise the default applies. This means the same Docker image runs identically in any environment by changing only the `.env` file — no code changes, no image rebuilds.
@@ -64,6 +66,7 @@ Responsible for all environment-specific values. No configuration is hardcoded i
 The `.env` file is git-ignored and never committed. `.env.example` is committed as a template — it contains all required variable names with safe defaults so anyone cloning the repo knows exactly what to configure.
 
 ### Runtime — `docker-compose.yml`
+
 Responsible for how the system starts, stops, and operates. It does not know how the app was built and does not contain any configuration values directly — it reads everything from `.env` and passes it into the container.
 
 Key runtime behaviors defined here:
@@ -206,6 +209,47 @@ curl -X DELETE http://localhost:9090/api/v1/users/1
 ```bash
 docker compose down
 ```
+
+---
+
+## Observability
+
+Once the application is running, the following are available to monitor its state:
+
+**Health status:**
+```bash
+curl http://localhost:9090/actuator/health
+```
+Returns `{"status":"UP"}` when the application is healthy. Docker also polls this endpoint automatically via the `HEALTHCHECK` directive in the Dockerfile every 30 seconds.
+
+**Check Docker health status:**
+```bash
+docker ps
+```
+The STATUS column shows `healthy` once the health check passes, confirming the app is fully ready.
+
+**Live application logs:**
+```bash
+# Stream logs in real time
+docker logs ar-assessment -f
+
+# Last 50 lines only
+docker logs ar-assessment --tail 50
+
+# With timestamps
+docker logs ar-assessment -f --timestamps
+```
+
+The application logs meaningful output at startup — database connection, schema creation, seed data loading, port binding — and logs every SQL query executed (configured via `show-sql: true`). This gives an operator clear visibility into the application state without needing additional tooling.
+
+**H2 database console:**
+
+Open `http://localhost:9090/h2-console` in your browser and connect with:
+- JDBC URL: `jdbc:h2:mem:usersdb`
+- Username: `sa`
+- Password: _(leave empty)_
+
+This provides a browser-based SQL interface to inspect the database directly during local development.
 
 ---
 
