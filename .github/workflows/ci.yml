@@ -1,0 +1,84 @@
+name: CI Pipeline
+
+# Trigger this pipeline on every push or pull request to main
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # ============================================================
+  # Job 1: BUILD AND TEST
+  # Compiles the app and runs all tests
+  # ============================================================
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Check out the code from GitHub
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+
+      # Step 3: Cache Gradle dependencies
+      # Avoids re-downloading on every run — speeds up the pipeline
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-
+
+      # Step 4: Make gradlew executable (required on Linux runners)
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # Step 5: Build and run tests
+      - name: Build and test with Gradle
+        run: ./gradlew build --no-daemon
+
+      # Step 6: Upload test results so they're visible in GitHub UI
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()  # Run even if tests fail so we can see the report
+        with:
+          name: test-results
+          path: build/reports/tests/test/
+
+  # ============================================================
+  # Job 2: DOCKER BUILD
+  # Builds the Docker image to confirm it packages correctly
+  # Only runs if build-and-test passes
+  # ============================================================
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: build-and-test  # Only runs if Job 1 succeeds
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Set up Docker Buildx for efficient multi-platform builds
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build the Docker image (don't push — just validate it builds)
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false  # Local build only — no registry configured
+          tags: ar-assessment:${{ github.sha }}
+          cache-from: type=gha   # Use GitHub Actions cache for Docker layers
+          cache-to: type=gha,mode=max

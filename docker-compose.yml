@@ -1,0 +1,38 @@
+services:
+  assessment:
+    # Build the image from the Dockerfile in the current directory
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    # Name the container for easy reference
+    container_name: ar-assessment
+
+    # Map host port to container port
+    # Format: "HOST:CONTAINER" — access via localhost:9090
+    ports:
+      - "${SERVER_PORT:-9090}:${SERVER_PORT:-9090}"
+
+    # Load all environment variables from the .env file
+    env_file:
+      - .env
+
+    # Pass specific environment variables into the container
+    environment:
+      - SERVER_PORT=${SERVER_PORT:-9090}
+      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL:-jdbc:h2:mem:usersdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
+      - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME:-sa}
+      - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD:-}
+      - LOGGING_LEVEL_ROOT=${LOGGING_LEVEL_ROOT:-INFO}
+      - LOGGING_LEVEL_APP=${LOGGING_LEVEL_APP:-DEBUG}
+
+    # Health check so Compose knows when the app is truly ready
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:${SERVER_PORT:-9090}/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+    # Always restart the container if it crashes unexpectedly
+    restart: unless-stopped
